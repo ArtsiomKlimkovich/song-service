@@ -1,41 +1,88 @@
 package songservice.streamify.service.track;
 
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import songservice.streamify.dto.TrackDto;
+import songservice.streamify.dto.track.CreateTrackDto;
+import songservice.streamify.dto.track.TrackDto;
+import songservice.streamify.dto.track.UpdateTrackDto;
 import songservice.streamify.entity.Track;
 import songservice.streamify.repository.TrackRepository;
+import songservice.streamify.utils.MinioUtils;
+import songservice.streamify.mapper.TrackMapper;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrackServiceImpl implements TrackService{
     private final TrackRepository trackRepository;
+    private final MinioUtils minioUtils;
+    private final TrackMapper trackMapper;
+
+    @Value("${minio.buckets.track}")
+    private String trackBucket;
+
+    @Value("${minio.buckets.artwork}")
+    private String artworkBucket;
 
     @Override
-    public void addTrack(TrackDto dto) {
-        Track track = new Track();
-        track.setArtistId(dto.artistId());
-        track.setName(dto.name());
-        track.setArtistName(dto.artistName());
-        trackRepository.save(track);
+    @SneakyThrows
+    public void addTrack(CreateTrackDto dto) {
+        Path tempTrackFile = null;
+        Path tempArtworkFile = null;
+        try {
+            tempTrackFile = Files.createTempFile("track-", dto.file().getOriginalFilename());
+            dto.file().transferTo(tempTrackFile.toFile());
+
+            tempArtworkFile = Files.createTempFile("artwork-", dto.artwork().getOriginalFilename());
+            dto.artwork().transferTo(tempArtworkFile.toFile());
+
+            minioUtils.createBucket(trackBucket);
+            minioUtils.createBucket(artworkBucket);
+
+            String trackObjectName = UUID.randomUUID() + "-" + dto.file().getOriginalFilename();
+            String artworkObjectName = UUID.randomUUID() + "-" + dto.artwork().getOriginalFilename();
+
+            minioUtils.uploadFile(trackBucket, trackObjectName, tempTrackFile.toString());
+            minioUtils.uploadFile(artworkBucket, artworkObjectName, tempArtworkFile.toString());
+
+            String trackUrl = minioUtils.getPresignedObjectUrl(trackBucket, trackObjectName);
+            String artworkUrl = minioUtils.getPresignedObjectUrl(artworkBucket, artworkObjectName);
+
+            Track track = new Track();
+            track.setArtistId(dto.artistId());
+            track.setName(dto.name());
+            track.setArtistName(dto.artistName());
+            track.setTrackUrl(trackUrl);
+            track.setArtworkUrl(artworkUrl);
+            trackRepository.save(track);
+        } finally {
+            if (tempTrackFile != null) {
+                Files.deleteIfExists(tempTrackFile);
+            }
+            if (tempArtworkFile != null) {
+                Files.deleteIfExists(tempArtworkFile);
+            }
+        }
     }
 
     @Override
     public TrackDto getTrackById(UUID id) {
         Track track = trackRepository.findById(id).orElseThrow(() -> new RuntimeException("Track does not exist."));
-        return new TrackDto(track.getArtistId(), track.getName(), track.getArtistName());
+        return trackMapper.toDto(track);
     }
 
     @Override
-    public TrackDto updateTrackById(TrackDto dto, UUID id) {
+    public void updateTrackById(UpdateTrackDto dto, UUID id) {
         Track track = trackRepository.findById(id).orElseThrow(() -> new RuntimeException("Track does not exist."));
-        track.setArtistId(dto.artistId());
-        track.setName(dto.name());
-        track.setArtistName(dto.artistName());
+        trackMapper.updateTrackFromDto(dto, track);
         trackRepository.save(track);
-        return dto;
     }
 
     @Override
