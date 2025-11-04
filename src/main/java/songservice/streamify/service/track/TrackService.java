@@ -1,12 +1,14 @@
 package songservice.streamify.service.track;
 
-import songservice.streamify.dto.TrackDto;
+import songservice.streamify.dto.track.CreateTrackDto;
+import songservice.streamify.dto.track.TrackDto;
+import songservice.streamify.dto.track.UpdateTrackDto;
 
 import java.util.UUID;
 
 public interface TrackService {
-    public void addTrack(TrackDto dto);
-    public TrackDto getTrackById(UUID id);
-    public TrackDto updateTrackById(TrackDto dto, UUID id);
-    public void deleteTrackById(UUID id);
+    void addTrack(CreateTrackDto dto);
+    TrackDto getTrackById(UUID id);
+    void updateTrackById(UpdateTrackDto dto, UUID id);
+    void deleteTrackById(UUID id);
 }

@@ -3,7 +3,10 @@ package songservice.streamify.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import songservice.streamify.dto.TrackDto;
+import org.springframework.web.multipart.MultipartFile;
+import songservice.streamify.dto.track.CreateTrackDto;
+import songservice.streamify.dto.track.TrackDto;
+import songservice.streamify.dto.track.UpdateTrackDto;
 import songservice.streamify.service.track.TrackService;
 
 import java.util.UUID;
@@ -14,8 +17,14 @@ import java.util.UUID;
 public class TrackController {
     private final TrackService trackService;
 
-    @PostMapping
-    public ResponseEntity<String> addTrack(@RequestBody TrackDto dto){
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<String> addTrack(
+            @RequestParam("artistId") UUID artistId,
+            @RequestParam("name") String name,
+            @RequestParam("artistName") String artistName,
+            @RequestParam("artwork") MultipartFile artwork,
+            @RequestParam("file") MultipartFile file){
+        CreateTrackDto dto = new CreateTrackDto(artistId, name, artistName, artwork, file);
         trackService.addTrack(dto);
         return ResponseEntity.ok("Track added successfully.");
     }
@@ -27,9 +36,10 @@ public class TrackController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<TrackDto> updateTrackById(@RequestBody TrackDto dto, @PathVariable UUID id){
+    public ResponseEntity<TrackDto> updateTrackById(@RequestBody UpdateTrackDto dto, @PathVariable UUID id){
         trackService.updateTrackById(dto, id);
-        return ResponseEntity.ok(dto);
+        TrackDto updated = trackService.getTrackById(id);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")

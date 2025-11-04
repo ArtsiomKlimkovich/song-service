@@ -1,13 +1,11 @@
 package songservice.streamify.entity;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.UUID;
 
@@ -29,8 +27,11 @@ public class Track {
 
     private String artistName;
 
+    @Column(name = "artwork_url", length = 1000)
+    private String artworkUrl;
+
+    @Column(name = "track_url", length = 1000)
     private String trackUrl;
 
-    private String artworkUrl;
     // more
 }

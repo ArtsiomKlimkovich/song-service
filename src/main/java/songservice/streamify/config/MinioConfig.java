@@ -1,0 +1,44 @@
+package songservice.streamify.config;
+
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Data
+@Configuration
+@ConfigurationProperties(prefix = "minio")
+@Slf4j
+public class MinioConfig {
+    private String endpoint;
+    private String accessKey;
+    private String secretKey;
+    // Optional single default bucket; may be unset when using multiple buckets
+    private String bucketName;
+
+    @Bean
+    public MinioClient minioClient() {
+        MinioClient minioClient = MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(accessKey, secretKey)
+                .build();
+
+        try {
+            if (bucketName != null && !bucketName.isBlank()) {
+                boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+                if (!bucketExists) {
+                    minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+                    log.info("Bucket '{}' created.", bucketName);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error checking or creating the bucket: {}", e.getMessage(), e);
+        }
+
+        return minioClient;
+    }
+}
