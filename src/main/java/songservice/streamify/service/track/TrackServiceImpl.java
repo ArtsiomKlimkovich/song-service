@@ -5,6 +5,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import songservice.streamify.dto.track.CreateTrackDto;
 import songservice.streamify.dto.track.TrackDto;
 import songservice.streamify.dto.track.UpdateTrackDto;
@@ -83,6 +84,42 @@ public class TrackServiceImpl implements TrackService{
         Track track = trackRepository.findById(id).orElseThrow(() -> new RuntimeException("Track does not exist."));
         trackMapper.updateTrackFromDto(dto, track);
         trackRepository.save(track);
+    }
+
+    @Override
+    @SneakyThrows
+    public void updateTrackArtwork(UUID id, MultipartFile artworkFile) {
+        Track track = trackRepository.findById(id).orElseThrow(() -> new RuntimeException("Track does not exist."));
+
+        Path tempArtworkFile = null;
+        try {
+            minioUtils.createBucket(artworkBucket);
+            tempArtworkFile = Files.createTempFile("artwork-", artworkFile.getOriginalFilename());
+            artworkFile.transferTo(tempArtworkFile.toFile());
+
+            String newArtworkObjectName = UUID.randomUUID() + "-" + artworkFile.getOriginalFilename();
+            minioUtils.uploadFile(artworkBucket, newArtworkObjectName, tempArtworkFile.toString());
+            String newArtworkUrl = minioUtils.getPresignedObjectUrl(artworkBucket, newArtworkObjectName);
+
+            String oldArtworkUrl = track.getArtworkUrl();
+            if (oldArtworkUrl != null) {
+                String oldObjectName = minioUtils.extractObjectNameFromUrl(oldArtworkUrl, artworkBucket);
+                if (oldObjectName != null && !oldObjectName.isBlank()) {
+                    try {
+                        minioUtils.deleteObject(artworkBucket, oldObjectName);
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old artwork object: {}", oldObjectName, e);
+                    }
+                }
+            }
+
+            track.setArtworkUrl(newArtworkUrl);
+            trackRepository.save(track);
+        } finally {
+            if (tempArtworkFile != null) {
+                Files.deleteIfExists(tempArtworkFile);
+            }
+        }
     }
 
     @Override

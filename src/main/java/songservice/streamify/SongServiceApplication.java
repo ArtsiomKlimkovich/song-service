@@ -11,3 +11,14 @@ public class SongServiceApplication {
     }
 
 }
+
+/*
+TABLES FOR CASSANDRA LATER
+Track
+Album
+Playlist
+Tracks by Album
+Tracks by Playlist
+Tracks by User
+Tracks by Artist
+*/

@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+
 @Component
 @RequiredArgsConstructor
 public class MinioUtils {
@@ -34,11 +36,37 @@ public class MinioUtils {
     }
 
     @SneakyThrows(Exception.class)
+    public void deleteObject(String bucketName, String objectName) {
+        minioClient.removeObject(RemoveObjectArgs.builder()
+                .bucket(bucketName)
+                .object(objectName)
+                .build());
+    }
+
+    @SneakyThrows(Exception.class)
     public String getPresignedObjectUrl(String bucketName, String objectName) {
         GetPresignedObjectUrlArgs args = GetPresignedObjectUrlArgs.builder()
                 .bucket(bucketName)
                 .object(objectName)
                 .method(Method.GET).build();
         return minioClient.getPresignedObjectUrl(args);
+    }
+
+    public String extractObjectNameFromUrl(String url, String bucketName) {
+        try {
+            URI uri = URI.create(url);
+            String path = uri.getPath();
+            String prefix = "/" + bucketName + "/";
+            int idx = path.indexOf(prefix);
+            if (idx >= 0) {
+                return path.substring(idx + prefix.length());
+            }
+            if (path.startsWith("/")) {
+                return path.substring(1);
+            }
+            return path;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

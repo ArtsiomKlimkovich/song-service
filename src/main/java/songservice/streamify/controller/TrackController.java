@@ -42,6 +42,12 @@ public class TrackController {
         return ResponseEntity.ok(updated);
     }
 
+    @PatchMapping(value = "/{id}/artwork", consumes = "multipart/form-data")
+    public ResponseEntity<TrackDto> updateTrackArtwork(@PathVariable UUID id, @RequestParam("artwork") MultipartFile artwork){
+        trackService.updateTrackArtwork(id, artwork);
+        return ResponseEntity.ok(trackService.getTrackById(id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteTrackById(@PathVariable UUID id){
         trackService.deleteTrackById(id);
