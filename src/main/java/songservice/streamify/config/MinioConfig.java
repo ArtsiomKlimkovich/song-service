@@ -17,7 +17,6 @@ public class MinioConfig {
     private String endpoint;
     private String accessKey;
     private String secretKey;
-    // Optional single default bucket; may be unset when using multiple buckets
     private String bucketName;
 
     @Bean

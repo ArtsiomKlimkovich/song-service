@@ -1,6 +1,7 @@
 package songservice.streamify.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,9 +38,15 @@ public class TrackController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<TrackDto> updateTrackById(@RequestBody UpdateTrackDto dto, @PathVariable UUID id){
-        trackService.updateTrackById(dto, id);
+        trackService.updateTrackById(id, dto);
         TrackDto updated = trackService.getTrackById(id);
         return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping(value = "/{id}/artwork", consumes = "multipart/form-data")
+    public ResponseEntity<TrackDto> updateTrackArtwork(@PathVariable UUID id, @RequestParam("artwork") MultipartFile artwork) throws FileUploadException {
+        trackService.updateTrackArtwork(id, artwork);
+        return ResponseEntity.ok(trackService.getTrackById(id));
     }
 
     @DeleteMapping("/{id}")

@@ -1,18 +1,15 @@
 package songservice.streamify.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.springframework.data.jpa.repository.Modifying;
+import lombok.*;
 
 import java.util.UUID;
 
 // LATER SWITCH TO CASSANDRA
-@jakarta.persistence.Entity
+@Entity
 @Getter
 @Setter
+@Builder
 @Table(name = "tracks")
 @AllArgsConstructor
 @NoArgsConstructor
