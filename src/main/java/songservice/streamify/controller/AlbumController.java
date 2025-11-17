@@ -54,9 +54,9 @@ public class AlbumController {
         return ResponseEntity.ok("Album cover successfully updated.");
     }
 
-    @PostMapping("/{artistId}")
-    public ResponseEntity<String> addTrackToAlbum(@PathVariable UUID artistId, UUID id){
-        albumService.addTrackToAlbum(artistId, id);
+    @PostMapping("/{albumId}")
+    public ResponseEntity<String> addTrackToAlbum(@PathVariable UUID albumId, @RequestParam UUID id){
+        albumService.addTrackToAlbum(albumId, id);
         return ResponseEntity.ok("Track successfully added to album.");
     }
 }
