@@ -1,8 +1,10 @@
 package songservice.streamify.service.album;
 
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,164 +12,99 @@ import songservice.streamify.dto.album.AlbumDto;
 import songservice.streamify.dto.album.CreateAlbumDto;
 import songservice.streamify.dto.album.UpdateAlbumDto;
 import songservice.streamify.entity.Album;
-import songservice.streamify.entity.Track;
+import songservice.streamify.mapper.AlbumMapper;
 import songservice.streamify.repository.AlbumRepository;
 import songservice.streamify.repository.TrackRepository;
-import songservice.streamify.utils.MinioUtils;
+import songservice.streamify.utils.MinioService;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class AlbumServiceImpl implements AlbumService {
-
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
-    private final MinioUtils minioUtils;
+    private final MinioService minioService;
+    private final AlbumMapper albumMapper;
 
     @Value("${minio.buckets.artwork}")
     private String artworkBucket;
 
-    @Value("${minio.buckets.track}")
-    private String trackBucket;
-
     @Override
-    @SneakyThrows
-    public void createAlbum(CreateAlbumDto dto) {
-        Album album = new Album();
-        album.setArtistId(dto.artistId());
-        album.setName(dto.name());
-        album.setReleaseDate(dto.releaseDate());
-        album.setCoverUrl(dto.coverUrl());
+    public void createAlbum(CreateAlbumDto dto) throws FileUploadException {
+        String coverUrl = minioService.uploadFile(
+                dto.cover(),
+                artworkBucket,
+                "albums/" + dto.artistId() + "/" + dto.name().replaceAll("[^a-zA-Z0-9-]", "_") + "/cover_"
+        );
+
+        Album album = Album.builder()
+                .artistId(dto.artistId())
+                .name(dto.name())
+                .releaseDate(dto.releaseDate())
+                .coverUrl(coverUrl)
+                .trackIds(new HashSet<>())
+                .build();
+
         albumRepository.save(album);
     }
 
     @Override
     public AlbumDto getAlbumById(UUID id) {
-        Album album = albumRepository.findById(id).orElseThrow(() -> new RuntimeException("Album does not exist."));
-        return new AlbumDto(album.getArtistId(), album.getName(), album.getReleaseDate(), album.getCoverUrl());
+        return albumRepository.findById(id)
+                .map(albumMapper::toDto)
+                .orElseThrow(() -> new EntityNotFoundException("Album not found: " + id));
     }
 
     @Override
-    public void updateAlbumById(UpdateAlbumDto dto, UUID id) {
-        Album album = albumRepository.findById(id).orElseThrow(() -> new RuntimeException("Album does not exist."));
-        if (dto.name() != null) album.setName(dto.name());
-        if (dto.releaseDate() != null) album.setReleaseDate(dto.releaseDate());
-        if (dto.coverUrl() != null) album.setCoverUrl(dto.coverUrl());
+    public void updateAlbumById(UUID id, UpdateAlbumDto dto) {
+        Album album = albumRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Album not found: " + id));
+        albumMapper.updateAlbumFromDto(dto, album);
         albumRepository.save(album);
     }
 
     @Override
-    @SneakyThrows
-    public void updateAlbumCover(UUID id, MultipartFile coverFile) {
-        Album album = albumRepository.findById(id).orElseThrow(() -> new RuntimeException("Album does not exist."));
-
-        Path tempCover = null;
-        try {
-            minioUtils.createBucket(artworkBucket);
-            tempCover = Files.createTempFile("cover-", coverFile.getOriginalFilename());
-            coverFile.transferTo(tempCover.toFile());
-
-            String newObjectName = UUID.randomUUID() + "-" + coverFile.getOriginalFilename();
-            minioUtils.uploadFile(artworkBucket, newObjectName, tempCover.toString());
-            String newCoverUrl = minioUtils.getPresignedObjectUrl(artworkBucket, newObjectName);
-
-            String oldCoverUrl = album.getCoverUrl();
-            if (oldCoverUrl != null) {
-                String oldObject = minioUtils.extractObjectNameFromUrl(oldCoverUrl, artworkBucket);
-                if (oldObject != null && !oldObject.isBlank()) {
-                    try {
-                        minioUtils.deleteObject(artworkBucket, oldObject);
-                    } catch (Exception ignored) {}
-                }
-            }
-
-            album.setCoverUrl(newCoverUrl);
-            albumRepository.save(album);
-        } finally {
-            if (tempCover != null) {
-                Files.deleteIfExists(tempCover);
-            }
-        }
-    }
-
-    @Override
-    @SneakyThrows
-    public void addTracks(UUID albumId, List<MultipartFile> files) {
-        if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("No files provided.");
-        }
+    public void updateAlbumCover(UUID albumId, MultipartFile newCover) throws FileUploadException {
         Album album = albumRepository.findById(albumId)
-                .orElseThrow(() -> new RuntimeException("Album does not exist."));
+                .orElseThrow(() -> new EntityNotFoundException("Album not found: " + albumId));
 
-        Set<UUID> trackIds = album.getTrackIds();
-        if (trackIds == null) trackIds = new HashSet<>();
+        String oldUrl = album.getCoverUrl();
+        String newUrl = minioService.uploadFile(newCover, artworkBucket,
+                "albums/" + album.getArtistId() + "/" + album.getName().replaceAll("[^a-zA-Z0-9-]", "_") + "/cover_");
 
-        minioUtils.createBucket(trackBucket);
+        album.setCoverUrl(newUrl);
+        albumRepository.save(album);
 
-        for (MultipartFile file : files) {
-            if (file == null || file.isEmpty()) continue;
-            Path tempTrack = null;
-            try {
-                String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "audio";
-                tempTrack = Files.createTempFile("track-", originalName);
-                file.transferTo(tempTrack.toFile());
-
-                String objectName = UUID.randomUUID() + "-" + originalName;
-                minioUtils.uploadFile(trackBucket, objectName, tempTrack.toString());
-                String trackUrl = minioUtils.getPresignedObjectUrl(trackBucket, objectName);
-
-                Track track = new Track();
-                track.setArtistId(album.getArtistId());
-                track.setName(stripExtension(originalName));
-                track.setArtistName(null);
-                track.setArtworkUrl(null);
-                track.setTrackUrl(trackUrl);
-                track = trackRepository.save(track);
-
-                trackIds.add(track.getId());
-            } finally {
-                if (tempTrack != null) {
-                    try { Files.deleteIfExists(tempTrack); } catch (Exception e) { log.warn("Failed to delete temp track file", e); }
-                }
+        if (oldUrl != null) {
+            String oldObjectName = minioService.extractObjectNameFromUrl(oldUrl, artworkBucket);
+            if (oldObjectName != null) {
+                minioService.deleteObject(artworkBucket, oldObjectName);
             }
         }
+    }
 
-        album.setTrackIds(trackIds);
+    @Override
+    public void addTrackToAlbum(UUID albumId, UUID trackId) {
+        Album album = albumRepository.findById(albumId)
+                .orElseThrow(() -> new EntityNotFoundException("Album not found: " + albumId));
+
+        if (!trackRepository.existsById(trackId)) {
+            throw new EntityNotFoundException("Track not found: " + trackId);
+        }
+
+        album.getTrackIds().add(trackId);
         albumRepository.save(album);
     }
 
     @Override
-    public void addTrackIds(UUID albumId, List<UUID> newTrackIds) {
-        if (newTrackIds == null || newTrackIds.isEmpty()) {
-            throw new IllegalArgumentException("No track IDs provided.");
+    public void deleteAlbumById(UUID id) {
+        if (!albumRepository.existsById(id)) {
+            throw new EntityNotFoundException("Album not found: " + id);
         }
-        Album album = albumRepository.findById(albumId)
-                .orElseThrow(() -> new RuntimeException("Album does not exist."));
-
-        List<Track> tracks = trackRepository.findAllById(newTrackIds);
-        if (tracks.size() != newTrackIds.size()) {
-            throw new IllegalArgumentException("One or more track IDs do not exist.");
-        }
-
-        Set<UUID> trackIds = album.getTrackIds();
-        if (trackIds == null) trackIds = new HashSet<>();
-        for (Track t : tracks) {
-            trackIds.add(t.getId());
-        }
-        album.setTrackIds(trackIds);
-        albumRepository.save(album);
-    }
-
-    private String stripExtension(String filename) {
-        if (filename == null) return null;
-        int idx = filename.lastIndexOf('.');
-        return (idx > 0) ? filename.substring(0, idx) : filename;
+        albumRepository.deleteById(id);
     }
 }

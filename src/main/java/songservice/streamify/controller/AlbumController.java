@@ -1,6 +1,7 @@
 package songservice.streamify.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -9,7 +10,7 @@ import songservice.streamify.dto.album.CreateAlbumDto;
 import songservice.streamify.dto.album.UpdateAlbumDto;
 import songservice.streamify.service.album.AlbumService;
 
-import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -18,38 +19,44 @@ import java.util.UUID;
 public class AlbumController {
     private final AlbumService albumService;
 
-    @PostMapping
-    public ResponseEntity<String> createAlbum(@RequestBody CreateAlbumDto dto){
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<String> createAlbum(
+            @RequestParam("artistId") UUID artistId,
+            @RequestParam("name") String name,
+            @RequestParam("releaseDate") LocalDate releaseDate,
+            @RequestParam("file") MultipartFile cover) throws FileUploadException {
+        CreateAlbumDto dto = new CreateAlbumDto(artistId, name, releaseDate, cover);
         albumService.createAlbum(dto);
         return ResponseEntity.ok("Album created successfully.");
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AlbumDto> getAlbumById(@PathVariable UUID id){
-        return ResponseEntity.ok(albumService.getAlbumById(id));
+        AlbumDto dto = albumService.getAlbumById(id);
+        return ResponseEntity.ok(dto);
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<AlbumDto> updateAlbum(@RequestBody UpdateAlbumDto dto, @PathVariable UUID id){
-        albumService.updateAlbumById(dto, id);
-        return ResponseEntity.ok(albumService.getAlbumById(id));
+    public ResponseEntity<String> updateAlbumById(@RequestBody UpdateAlbumDto dto, @PathVariable UUID id){
+        albumService.updateAlbumById(id, dto);
+        return ResponseEntity.ok("Album updated successfully.");
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteAlbumById(@PathVariable UUID id){
+        albumService.deleteAlbumById(id);
+        return ResponseEntity.ok("Album deleted successfully");
     }
 
     @PatchMapping(value = "/{id}/cover", consumes = "multipart/form-data")
-    public ResponseEntity<AlbumDto> updateAlbumCover(@PathVariable UUID id, @RequestParam("cover") MultipartFile cover){
+    public ResponseEntity<String> updateCover(@PathVariable UUID id, @RequestParam MultipartFile cover) throws FileUploadException {
         albumService.updateAlbumCover(id, cover);
-        return ResponseEntity.ok(albumService.getAlbumById(id));
+        return ResponseEntity.ok("Album cover successfully updated.");
     }
 
-    @PostMapping(value = "/{id}/tracks", consumes = "multipart/form-data")
-    public ResponseEntity<String> addTracksToAlbum(@PathVariable UUID id, @RequestParam("files") List<MultipartFile> files) {
-        albumService.addTracks(id, files);
-        return ResponseEntity.ok("Tracks added to album successfully.");
-    }
-
-    @PostMapping(value = "/{id}/tracks/ids", consumes = "application/json")
-    public ResponseEntity<String> addExistingTracksToAlbum(@PathVariable UUID id, @RequestBody List<UUID> trackIds) {
-        albumService.addTrackIds(id, trackIds);
-        return ResponseEntity.ok("Track IDs added to album successfully.");
+    @PostMapping("/{artistId}")
+    public ResponseEntity<String> addTrackToAlbum(@PathVariable UUID artistId, UUID id){
+        albumService.addTrackToAlbum(artistId, id);
+        return ResponseEntity.ok("Track successfully added to album.");
     }
 }

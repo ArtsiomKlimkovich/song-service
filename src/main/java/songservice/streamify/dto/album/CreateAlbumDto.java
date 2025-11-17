@@ -1,11 +1,13 @@
 package songservice.streamify.dto.album;
 
-import java.util.Date;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record CreateAlbumDto(
    UUID artistId,
    String name,
-   Date releaseDate,
-   String coverUrl
+   LocalDate releaseDate,
+   MultipartFile cover
 ) {}
