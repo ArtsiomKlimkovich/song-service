@@ -14,6 +14,6 @@ public interface AlbumService {
     AlbumDto getAlbumById(UUID id);
     void updateAlbumById(UUID id, UpdateAlbumDto dto);
     void deleteAlbumById(UUID id);
-    void updateAlbumCover(UUID id, MultipartFile file) throws FileUploadException;
+    void updateAlbumCover(UUID id, MultipartFile cover) throws FileUploadException;
     void addTrackToAlbum(UUID albumId, UUID id);
 }

@@ -37,7 +37,7 @@ public class TrackController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<TrackDto> updateTrackById(@RequestBody UpdateTrackDto dto, @PathVariable UUID id){
+    public ResponseEntity<TrackDto> updateTrackById(@PathVariable UUID id, @RequestBody UpdateTrackDto dto){
         trackService.updateTrackById(id, dto);
         TrackDto updated = trackService.getTrackById(id);
         return ResponseEntity.ok(updated);

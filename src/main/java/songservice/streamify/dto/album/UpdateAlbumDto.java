@@ -4,6 +4,5 @@ import java.util.Date;
 
 public record UpdateAlbumDto(
     String name,
-    Date releaseDate,
-    String coverUrl
+    Date releaseDate
 ){}
