@@ -12,6 +12,7 @@ import songservice.streamify.dto.album.AlbumDto;
 import songservice.streamify.dto.album.CreateAlbumDto;
 import songservice.streamify.dto.album.UpdateAlbumDto;
 import songservice.streamify.entity.Album;
+import songservice.streamify.entity.Track;
 import songservice.streamify.mapper.AlbumMapper;
 import songservice.streamify.repository.AlbumRepository;
 import songservice.streamify.repository.TrackRepository;
@@ -102,9 +103,18 @@ public class AlbumServiceImpl implements AlbumService {
 
     @Override
     public void deleteAlbumById(UUID id) {
-        if (!albumRepository.existsById(id)) {
-            throw new EntityNotFoundException("Album not found: " + id);
+        Album album = albumRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Album not found: " + id));
+
+        try {
+            if (album.getCoverUrl() != null) {
+                String obj = minioService.extractObjectNameFromUrl(album.getCoverUrl(), artworkBucket);
+                if (obj != null) minioService.deleteObject(artworkBucket, obj);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to cleanup MinIO objects for album {}", id, e);
         }
-        albumRepository.deleteById(id);
+
+        trackRepository.deleteById(id);
     }
 }

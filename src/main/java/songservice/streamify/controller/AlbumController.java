@@ -24,7 +24,7 @@ public class AlbumController {
             @RequestParam("artistId") UUID artistId,
             @RequestParam("name") String name,
             @RequestParam("releaseDate") LocalDate releaseDate,
-            @RequestParam("file") MultipartFile cover) throws FileUploadException {
+            @RequestParam("cover") MultipartFile cover) throws FileUploadException {
         CreateAlbumDto dto = new CreateAlbumDto(artistId, name, releaseDate, cover);
         albumService.createAlbum(dto);
         return ResponseEntity.ok("Album created successfully.");
@@ -37,7 +37,7 @@ public class AlbumController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<String> updateAlbumById(@RequestBody UpdateAlbumDto dto, @PathVariable UUID id){
+    public ResponseEntity<String> updateAlbumById(@PathVariable UUID id, @RequestBody UpdateAlbumDto dto){
         albumService.updateAlbumById(id, dto);
         return ResponseEntity.ok("Album updated successfully.");
     }
